@@ -1,5 +1,7 @@
+using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
 using src.Models;
 using src.Persistence;
 
@@ -17,38 +19,76 @@ public class PessoaController : ControllerBase{
     }
 
     [HttpGet]
-    public List<Pessoa> Get() {
-        // Pessoa pessoa = new Pessoa("Caio", 26, "13322244433");
-        // Contrato contrato = new Contrato("caio", 30.32);
+    public ActionResult<List<Pessoa>> Get() {
 
-        // pessoa.contratos.Add(contrato);
+        var result = this._context.Pessoas.Include(p => p.contratos).ToList();
         
-        return this._context.Pessoas.Include(p => p.contratos).ToList();
+        if (!result.Any()) {
+            return NoContent();
+        }
+
+        return Ok(result);
     }
 
     [HttpPost]
-    public Pessoa Post([FromBody]Pessoa pessoa) {
-        this._context.Pessoas.Add(pessoa);
-        this._context.SaveChanges();
+    public ActionResult<Pessoa> Post([FromBody]Pessoa pessoa) {
+        try {
+            this._context.Pessoas.Add(pessoa);
+            this._context.SaveChanges();
+        }
+        catch (System.Exception) {
+            return BadRequest(new {
+                msg = "Falha ao salvar os dados",
+                status = HttpStatusCode.BadRequest
+            });
+        }
 
-        return pessoa;
+        return Created("Criado", pessoa);
     }
 
     [HttpPut("{id}")]
-    public string Put([FromRoute]int id, [FromBody]Pessoa pessoa) {
-        this._context.Pessoas.Update(pessoa);
-        this._context.SaveChanges();
+    public ActionResult<Object> Put([FromRoute]int id, [FromBody]Pessoa pessoa) {
 
-        return "Dados do id" + id + "atualizados.";    
+        var result = this._context.Pessoas.SingleOrDefault(e => e.Id == id);
+
+        if (result is null) {
+            return NotFound(new {
+                msg = "Registro não encontrado",
+                status = HttpStatusCode.NotFound
+            });
+        }
+        try {
+            this._context.Pessoas.Update(pessoa);
+            this._context.SaveChanges();
+        }
+        catch (System.Exception) {
+            return BadRequest(new {
+                msg = "Houve erro ao enviar solicitação de atualização do id " + id,
+                status = HttpStatusCode.BadRequest
+            });
+        }
+        return Ok(new {
+            msg = "Dados do id" + id + "atualizados.",
+            status = HttpStatusCode.OK
+        });    
     }
 
     [HttpDelete("{id}")]
-    public string Delete([FromRoute]int id) {
+    public ActionResult<Object> Delete([FromRoute]int id) {
         var result = this._context.Pessoas.SingleOrDefault(e => e.Id == id);
 
+        if (result is null) {
+            return BadRequest(new { //formato json
+                msg = "Conteúdo inexistente, solicitação invalida.",
+                status = HttpStatusCode.BadRequest, //enum para os status code..
+            });
+        }
         this._context.Pessoas.Remove(result);
         this._context.SaveChanges();
 
-        return "deletado pessoa de Id " + id;
+        return Ok(new {
+                msg = "deletado pessoa de Id " + id,
+                status = HttpStatusCode.OK
+        });
     }
 }
